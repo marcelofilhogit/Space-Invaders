@@ -8,8 +8,8 @@
 (struct monstro corpo (patrulha-x rapidez-x)        #:transparent)
 (struct tiro  corpo   (velocity-x velocity-y)   #:transparent)
 (struct nave  corpo    (morto?)                   #:transparent)
-(define cutruca #F)
-
+(define gameover 0)
+(define mortoto #F)
 
 #| Criando Constantes do Jogo |#
 
@@ -57,14 +57,13 @@
     (novoMonstro x y)))
 
 
-
 #| Criando Atualizações no Jogo |#
 
 ;Atualizando Nave
 (define (atualizarNave w)
   (match-define (mundo p is bs) w)
   (match-define (nave x y tamanho d) p)
-  (define morto? (or d (colisoes? p bs)))  
+  (define morto? (or (or d (colisoes? p bs)) mortoto))  
   (define moverNave
     (cond [d                   p]
           [(tecla? 'left)  (cond [(> x 1) (nave (- x 3.) y tamanho morto?)][else (nave x y tamanho morto?)])]
@@ -157,6 +156,7 @@
 
 #| Colisão |#
 
+
 ;Colidindo
 (define (colidindo? b1 b2)
   (match-define (corpo x1 y1 s1) b1)
@@ -181,6 +181,7 @@
   (match-define (mundo p is bs) w)
   (define (colisoesSemTiros? x)
     (not (colisoes? x bs)))
+  
   (mundo p 
          (filter colisoesSemTiros? is)
          (filter dentroTela? ;remova os tiros não visíveis
@@ -195,17 +196,23 @@
   (desenharCorpos (append (list p) is bs) dc))
 
 (define (desenharCorpos bs dc)
+  (set! pontos 0)
   (for ([b bs])
     (match-define (corpo x y s) b)
-    ;(define c (if (nave? b) (if (nave-morto? b) "red" "green") "black"))    
     (if (equal? (if (nave? b) (if (nave-morto? b) "red" "green") "black") "red")
        (send dc draw-bitmap (make-object bitmap% "game-over.jpg") 10 0)
         (cond
           [(= s 3) (send dc draw-bitmap (make-object bitmap% "tiro.png") x y)]
-          [(= s 14) (send dc draw-bitmap (make-object bitmap% "monstro.png") x y)]
+          [(= s 14) (send dc draw-bitmap (make-object bitmap% "monstro.png") x y)
+                    (set! pontos (+ pontos 1))
+                    (cond [(> y (- altura 80)) (set! mortoto #t)])]
           [(= s 15) (send dc draw-bitmap (make-object bitmap% "nave.png") x y)]
-          [else (send dc draw-bitmap (make-object bitmap% "nave.png") x y)]
-          ))))
+          [else (send dc draw-bitmap (make-object bitmap% "nave.png") x y)])
+
+         
+         ))
+  (cond [(= pontos 0) (send dc draw-bitmap (make-object bitmap% "youwon.png") 10 0)])
+  )
 
 
 #| ESTADO DA GUI |#
@@ -252,9 +259,8 @@
 ;Cria tela
 (define frame  (new frame%  [label "Space Invaders"]))
 
-;Texto de pontos
 (define msg (new message% [parent frame]
-                          [label "Pontos: "]))
+                          [label "Ponotos: 0"]))
 
 (define canvas (new game-canvas%
                     [parent frame]
@@ -266,8 +272,11 @@
 ; Comece um temporizador. Cada vez que o timer dispara, o mundo é atualizado.
 (define timer (new timer% 
                    [notify-callback 
-                    (λ () 
-                      (set! oMundo (atualizar oMundo))
-                      (send canvas on-paint))]
+                    (λ ()
+                       (set! oMundo (atualizar oMundo))
+                      
+                      (send msg set-label (format "Pontos: ~a" (- 36 pontos)))
+                      (send canvas on-paint)
+                      )]
                    [interval 100])) ; in milliseconds
 (send timer start 20)
